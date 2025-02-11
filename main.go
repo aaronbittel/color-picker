@@ -21,18 +21,21 @@ var SORT_BY = []string{"count", "red", "green", "blue"}
 
 func main() {
 	var (
-		filepath string
-		sortBy   string
-		limit    int
-		verbose  bool
+		filepath  string
+		sortBy    string
+		limit     int
+		verbose   bool
+		proximity float64
 	)
 
-	sortUsage := fmt.Sprintf("sort pixels by {%s}", strings.Join(SORT_BY, ", "))
+	sortUsage := fmt.Sprintf("Sort colors by one of: %s", strings.Join(SORT_BY, ", "))
 
-	flag.StringVar(&filepath, "path", "", "png file to analyze [optional]")
+	flag.StringVar(&filepath, "path", "", "Path to a PNG file (skips Flameshot)")
 	flag.StringVar(&sortBy, "sort", "", sortUsage)
-	flag.IntVar(&limit, "limit", 0, "limit output count")
-	flag.BoolVar(&verbose, "verbose", false, "extra sort values")
+	flag.IntVar(&limit, "limit", 0, "Limit the number of colors displayed")
+	flag.BoolVar(&verbose, "verbose", false, "Show additional sorting details")
+	flag.Float64Var(&proximity, "proximity", 15.0,
+		"Group colors within this proximity into an average")
 	flag.Parse()
 
 	var err error
@@ -44,12 +47,23 @@ func main() {
 		}
 	}
 
-	colors, err := getPixels(filepath)
+	colors, err := getColors(filepath)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	groupedColors := groupSimilarColors(colors)
+	var groupedColors RGBColorPairSlice
+	if proximity <= 0 {
+		for color := range colors {
+			groupedColors = append(groupedColors, RGBCountPair{
+				rgb:   color,
+				count: 1,
+			})
+		}
+	} else {
+		groupedColors = groupSimilarColors(colors, proximity)
+	}
+
 	groupedColors = sort(groupedColors, sortBy)
 	groupedColors = limitSlice(groupedColors, limit)
 
@@ -76,7 +90,7 @@ func flameshot() (string, error) {
 	return filepath, nil
 }
 
-func getPixels(filepath string) (map[RGB]struct{}, error) {
+func getColors(filepath string) (map[RGB]struct{}, error) {
 	f, err := os.Open(filepath)
 	if err != nil {
 		return nil, err
@@ -103,7 +117,7 @@ func getPixels(filepath string) (map[RGB]struct{}, error) {
 	return colorSet, nil
 }
 
-func groupSimilarColors(colorSet map[RGB]struct{}) RGBColorPairSlice {
+func groupSimilarColors(colorSet map[RGB]struct{}, proximity float64) RGBColorPairSlice {
 	groupedColors := make([]RGBCountPair, 0, len(colorSet)/2)
 	visited := make([]bool, len(colorSet), len(colorSet))
 	colors := []RGB{}
@@ -126,7 +140,7 @@ func groupSimilarColors(colorSet map[RGB]struct{}) RGBColorPairSlice {
 			}
 
 			d := dist(colors[i], colors[j])
-			if d <= 15 {
+			if d <= float64(proximity) {
 				grouped = append(grouped, colors[j])
 				visited[j] = true
 			}

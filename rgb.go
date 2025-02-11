@@ -134,7 +134,7 @@ func (rgb RGB) asFormattedRGB() string {
 
 func (rgb RGB) printColor() {
 	colorBlock := fmt.Sprintf("%s%s%s", colored(rgb), strings.Repeat(FullBlock, 5), Reset)
-	fmt.Printf("%s -> %s (%s)\n", colorBlock, rgb.asFormattedRGB(), rgb.asHex())
+	fmt.Printf("%s %s | %s\n", colorBlock, rgb.asFormattedRGB(), rgb.asHex())
 }
 
 func colored(rgb RGB) string {
